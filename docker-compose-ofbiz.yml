@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  ofbiz1:
+    image: halims/ofbiz:latest
+    container_name: ofbiz1
+    volumes:
+      - ./export:/ofbiz/export:rw
+    networks:
+      - ofbiz-net
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    depends_on:
+      mariadb1:
+        condition: service_healthy
+      mariadb2:
+        condition: service_healthy
+      mariadb3:
+        condition: service_healthy
+    environment:
+      - JAVA_OPTS=-Xms512m -Xmx1024m
+      - OFBIZ_DATA_LOAD=seed
+      - OFBIZ_ENABLE_AJP_PORT=yes
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/webtools"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: on-failure:3      
+
+  ofbiz:
+    image: halims/ofbiz:latest
+#    container_name: ofbiz
+    volumes:
+      - ./export:/ofbiz/export:rw
+    networks:
+      - ofbiz-net
+#    ports:
+#      - "8081:8080"
+#      - "8444:8443"
+    depends_on:
+      ofbiz1:
+        condition: service_started
+    environment:
+      - JAVA_OPTS=-Xms512m -Xmx1024m
+      - OFBIZ_SKIP_INIT=yes
+      - OFBIZ_DATA_LOAD=none
+      - OFBIZ_ENABLE_AJP_PORT=yes
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/webtools"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: on-failure:3      
+    deploy:
+      mode: replicated
+      replicas: 2
+      
+  haproxy:
+    image: haproxy:latest
+    container_name: haproxy
+    volumes:
+      - ./config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - ofbiz-net
+    depends_on:
+      - ofbiz1
+      - ofbiz
+    restart: on-failure:3      
+
+networks:
+  ofbiz-net:
+    external: true

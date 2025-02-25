@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  mariadb1:
+    image: mariadb:11.7.2
+    container_name: mariadb1
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_USER: ofbizuser
+      MYSQL_PASSWORD: ofbizpass
+      MYSQL_INITDB_SKIP_TZINFO: "true"
+    command: >
+      --wsrep-on=ON
+      --wsrep-provider=/usr/lib/galera/libgalera_smm.so
+      --wsrep-cluster-address=gcomm://mariadb1,mariadb2,mariadb3
+      --wsrep-cluster-name=ofbiz_cluster
+      --wsrep-node-address=mariadb1
+      --wsrep-node-name=node1
+      --wsrep-sst-method=mariabackup
+      --binlog-format=ROW
+      --default-storage-engine=InnoDB
+      --innodb-autoinc-lock-mode=2
+      --wsrep-new-cluster
+    volumes:
+      - mariadb1-data:/var/lib/mysql
+      - ./config/db/:/docker-entrypoint-initdb.d/:ro
+    networks:
+      - ofbiz-net
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-uroot", "-prootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: on-failure:3      
+
+  mariadb2:
+    image: mariadb:11.7.2
+    container_name: mariadb2
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_USER: ofbizuser
+      MYSQL_PASSWORD: ofbizpass
+      MYSQL_INITDB_SKIP_TZINFO: "true"
+    command: >
+      --wsrep-on=ON
+      --wsrep-provider=/usr/lib/galera/libgalera_smm.so
+      --wsrep-cluster-address=gcomm://mariadb1,mariadb2,mariadb3
+      --wsrep-cluster-name=ofbiz_cluster
+      --wsrep-node-address=mariadb2
+      --wsrep-node-name=node2
+      --wsrep-sst-method=mariabackup
+      --binlog-format=ROW
+      --default-storage-engine=InnoDB
+      --innodb-autoinc-lock-mode=2
+    volumes:
+      - mariadb2-data:/var/lib/mysql
+    networks:
+      - ofbiz-net
+    depends_on:
+      mariadb1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-uroot", "-prootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: on-failure:3      
+
+  mariadb3:
+    image: mariadb:11.7.2
+    container_name: mariadb3
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_USER: ofbizuser
+      MYSQL_PASSWORD: ofbizpass
+      MYSQL_INITDB_SKIP_TZINFO: "true"
+    command: >
+      --wsrep-on=ON
+      --wsrep-provider=/usr/lib/galera/libgalera_smm.so
+      --wsrep-cluster-address=gcomm://mariadb1,mariadb2,mariadb3
+      --wsrep-cluster-name=ofbiz_cluster
+      --wsrep-node-address=mariadb3
+      --wsrep-node-name=node3
+      --wsrep-sst-method=mariabackup
+      --binlog-format=ROW
+      --default-storage-engine=InnoDB
+      --innodb-autoinc-lock-mode=2
+    volumes:
+      - mariadb3-data:/var/lib/mysql
+    networks:
+      - ofbiz-net
+    depends_on:
+      mariadb1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-uroot", "-prootpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    restart: on-failure:3      
+
+volumes:
+  mariadb1-data:
+  mariadb2-data:
+  mariadb3-data:
+
+networks:
+  ofbiz-net:
+    driver: bridge
